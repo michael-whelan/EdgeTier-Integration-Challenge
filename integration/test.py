@@ -3,13 +3,26 @@ from unittest.mock import patch
 
 import pytest
 
-from integration.integration import create_chat, fetch_events
+from integration.integration import create_chat, end_chat, fetch_events
 
-MOCK_EVENT = {"conversation_id": 123, "event_name": "START", "event_at": 1710000000}
+CONVERSATION_ID = 123
+
+MOCK_EVENT = {
+    "conversation_id": CONVERSATION_ID,
+    "event_name": "START",
+    "event_at": 1710000000,
+}
 MOCK_EVENT_START = {
     "event_name": "START",
-    "conversation_id": 123,
+    "conversation_id": CONVERSATION_ID,
     "event_at": 1710000000,
+}
+
+
+MOCK_CHAT = {
+    "chat_id": "abc-123",
+    "external_id": str(CONVERSATION_ID),
+    "agent_id": "agent-999",
 }
 
 
@@ -36,6 +49,18 @@ def test_create_chat_success(mock_post):
     mock_post.return_value.json.return_value = {"chat_id": "abc-123"}
     chat_id = create_chat(MOCK_EVENT_START)
     assert chat_id == "abc-123"
+
+
+@patch("integration.integration.requests.patch")
+@patch("integration.integration.requests.get")
+def test_end_chat_success(mock_get, mock_patch):
+    mock_get.return_value.status_code = 200
+    mock_get.return_value.json.return_value = [MOCK_CHAT]
+
+    mock_patch.return_value.status_code = 200
+
+    end_chat(CONVERSATION_ID)
+    mock_patch.assert_called_once()
 
 
 sample_data = [

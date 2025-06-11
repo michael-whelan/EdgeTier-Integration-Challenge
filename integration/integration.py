@@ -47,13 +47,38 @@ def create_chat(event: Dict[str, Any]) -> Optional[str]:
         return None
 
 
+def end_chat(conversation_id: int) -> None:
+    try:
+        chat = find_chat_by_conversation_id(conversation_id)
+        if chat:
+            patch_data = {"ended_at": datetime.now(timezone.utc).isoformat()}
+            requests.patch(f"{OUR_API}/chats/{chat['chat_id']}", json=patch_data)
+            logger.info(f"Marked chat {chat['chat_id']} as ended.")
+    except Exception as e:
+        logger.error(f"Failed to end chat: {e}")
+
+
+def find_chat_by_conversation_id(conversation_id: int) -> Optional[Dict[str, Any]]:
+    try:
+        resp = requests.get(
+            f"{OUR_API}/chats", params={"external_id": str(conversation_id)}
+        )
+        resp.raise_for_status()
+        chats = resp.json()
+        return chats[0] if chats else None
+    except Exception as e:
+        logger.error(f"Failed to find chat: {e}")
+        return None
+
+
 def handle_events(events: List[Dict[str, Any]]) -> None:
     for event in events:
         event_type = event.get("event_name")
         if event_type == "START":
             create_chat(event)
-        # elif event_type == "END":
-        #     # TODO end_chat(event)
+        elif event_type == "END":
+            end_chat(event["conversation_id"])
+            # TODO end_chat(event)
         # elif event_type == "MESSAGE":
         #     # TODO create_message(event)
         # elif event_type == "TRANSFER":
