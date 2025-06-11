@@ -58,3 +58,18 @@ When the app is running, you can find the documentation here: http://127.0.0.1:8
 Create an integration between BigChat API and Our API. Write a script that calls BigChat's `/events` route every 10 seconds (to get the latest events in the last 10 seconds) that will create/edit chats and agents in OurAPI as needed. Feel free to edit anything inside `/integration`. Add as many files or whatever structure you want. We would recommend writing tests as well.
 
 Please do not edit anything inside `/big_chat` or `/our_api`, assume they are APIs that can't be changed.
+
+## Design choices
+
+  - The conversation_id from BigChat is treated as the external_id in OurAPI. This made for 1:1 mapping and allows the script to look up and update chats across systems.
+  - When a TRANSFER event is received, the script queries OurAPI's /agents?name={advisor_id} to find a matching agent. This assumes advisor IDs are also used (or aliased) as names in OurAPI. In production this is likely not robust enough.
+  - Functional design: I found having a handler just call separate functions for each job simpler for compartmentalising the challenge and making the code more testable.
+
+
+## Design limitations
+
+  - The challenge was to get the latest events in the last 10 seconds. Which is fine assuming time begins when the script starts. This was for simplicity. Keeping a persistent time/cursor through all of `/big_chat` seemed to be getting into real data problems
+  - I didnt do any checks for duplication. Really this could be a nice layer to add before any new chats are created - as of now I'd likely overwrite.
+  - Retries: Since I'm querying two external APIs the chance of timeout likely exiss. I did not handle for this -> Prod would have to
+
+

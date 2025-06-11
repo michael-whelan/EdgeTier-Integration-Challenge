@@ -1,9 +1,13 @@
 from datetime import datetime, timezone
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
-import pytest
-
-from integration.integration import create_chat, end_chat, fetch_events
+from integration.integration import (
+    create_chat,
+    create_message,
+    end_chat,
+    fetch_events,
+    transfer_chat,
+)
 
 CONVERSATION_ID = 123
 
@@ -12,17 +16,31 @@ MOCK_EVENT = {
     "event_name": "START",
     "event_at": 1710000000,
 }
+
 MOCK_EVENT_START = {
     "event_name": "START",
     "conversation_id": CONVERSATION_ID,
     "event_at": 1710000000,
 }
 
-
 MOCK_CHAT = {
     "chat_id": "abc-123",
     "external_id": str(CONVERSATION_ID),
     "agent_id": "agent-999",
+}
+
+MOCK_EVENT_MESSAGE = {
+    "event_name": "MESSAGE",
+    "conversation_id": CONVERSATION_ID,
+    "event_at": 1710000020,
+    "data": {"message": "Hello", "sender": "customer"},
+}
+
+MOCK_EVENT_TRANSFER = {
+    "event_name": "TRANSFER",
+    "conversation_id": CONVERSATION_ID,
+    "event_at": 1710000030,
+    "data": {"new_advisor_id": 42},
 }
 
 
@@ -61,6 +79,36 @@ def test_end_chat_success(mock_get, mock_patch):
 
     end_chat(CONVERSATION_ID)
     mock_patch.assert_called_once()
+
+
+@patch("integration.integration.requests.patch")
+@patch("integration.integration.requests.get")
+def test_transfer_chat_success(mock_get, mock_patch):
+    # First call to get chat by external_id
+    mock_get.side_effect = [
+        MagicMock(status_code=200, json=lambda: [MOCK_CHAT]),
+        MagicMock(status_code=200, json=lambda: [{"agent_id": "agent-42"}]),
+    ]
+
+    mock_patch.return_value.status_code = 200
+    transfer_chat(MOCK_EVENT_TRANSFER)
+
+    mock_patch.assert_called_once()
+    assert mock_patch.call_args[1]["json"]["agent_id"] == "agent-42"
+
+
+@patch("integration.integration.requests.post")
+@patch("integration.integration.requests.get")
+def test_create_message_success(mock_get, mock_post):
+    mock_get.return_value.status_code = 200
+    mock_get.return_value.json.return_value = [MOCK_CHAT]
+
+    mock_post.return_value.status_code = 200
+    create_message(MOCK_EVENT_MESSAGE)
+    mock_post.assert_called_once()
+    data = mock_post.call_args[1]["json"]
+    assert data["text"] == "Hello"
+    assert data["agent_id"] is None
 
 
 sample_data = [
